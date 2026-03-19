@@ -1,0 +1,20 @@
+[server]
+enableCORS = false
+enableXsrfProtection = false
+maxUploadSize = 10
+headless = false
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+serverPort = 8501
+
+[runner]
+fastReruns = true
+
+[client]
+showErrorDetails = false
+toolbarMode = "minimal"
+
+[theme]
+base = "dark"

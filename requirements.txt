@@ -1,0 +1,10 @@
+streamlit
+pandas
+numpy
+scikit-learn
+supabase
+python-dotenv
+reportlab
+groq
+cohere
+google-generativeai
