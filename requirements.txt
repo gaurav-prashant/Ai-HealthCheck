@@ -8,3 +8,4 @@ reportlab
 groq
 cohere
 google-generativeai
+joblib

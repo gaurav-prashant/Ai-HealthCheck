@@ -6,7 +6,13 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 def show_medical_store():
-    st.markdown("<div class='section-header'>💊 Medical Store & Pharmacy Finder</div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="section-header">
+            <img src="https://img.icons8.com/fluency/96/pill.png" width="50" style="margin-bottom: 10px;">
+            <br>
+            💊 Medical Store & Pharmacy Finder
+        </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("""
     <div style='background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2);

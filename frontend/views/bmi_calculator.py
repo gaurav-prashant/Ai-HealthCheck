@@ -1,7 +1,3 @@
-# ============================================================
-# bmi_calculator.py — Complete BMI Calculator
-# ============================================================
-
 import streamlit as st
 import pandas as pd
 
@@ -55,15 +51,19 @@ def get_diet_tips(category):
 
 # ---------- SHOW BMI SECTION ----------
 def show_bmi_section():
-    st.markdown("<div class='section-header'>💪 BMI Calculator</div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="section-header">
+            <img src="https://img.icons8.com/fluency/96/weight-scale.png" width="50" style="margin-bottom: 10px;">
+            <br>
+            💪 BMI Calculator
+        </div>
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.markdown("<div class='glass-box'>", unsafe_allow_html=True)
         st.markdown("<div class='section-title'>📏 Enter Your Details</div>", unsafe_allow_html=True)
-
-        st.text_input("👤 Your Name", key="bmi_name_input")
         st.number_input("🎂 Age", 1, 120, 25, key="bmi_age_input")
         gender    = st.selectbox("⚧ Gender", ["Male", "Female"])
         height_cm = st.number_input("📏 Height (cm)", 50, 250, 170, key="bmi_height_input")

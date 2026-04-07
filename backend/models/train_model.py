@@ -4,7 +4,7 @@
 
 import pandas as pd
 import numpy as np
-import pickle
+import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import accuracy_score
@@ -179,9 +179,9 @@ def train():
 
     print("🤖 Training models...")
 
-    # Fast & Accurate: Random Forest only
+    # Fast & Accurate: Random Forest only (reduced estimators for speed)
     rf = RandomForestClassifier(
-        n_estimators=300,
+        n_estimators=100,
         max_depth=None,
         min_samples_split=2,
         min_samples_leaf=1,
@@ -207,7 +207,7 @@ def train():
     print(f"   Symptoms:       {len(SYMPTOMS)}")
     print(f"   Training Samples: {len(X_train)}")
 
-    # Save model
+    # Save model as joblib (faster than pickle)
     model_data = {
         "model":    rf,
         "accuracy": accuracy,
@@ -216,10 +216,9 @@ def train():
         "cv_score": cv_scores.mean()
     }
 
-    with open("model.pkl", "wb") as f:
-        pickle.dump(model_data, f)
+    joblib.dump(model_data, "model.joblib", compress=3)
 
-    print(f"\n✅ Model saved as model.pkl")
+    print(f"\n✅ Model saved as model.joblib")
     print(f"🎯 Final Accuracy: {accuracy*100:.2f}%")
 
     # Show per-disease accuracy

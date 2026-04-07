@@ -5,8 +5,10 @@
 import pandas as pd
 import os
 import streamlit as st
+from backend.services.auth import supabase
 
-APPOINTMENT_FILE = "appointments.csv"
+# APPOINTMENT_FILE = "appointments.csv"  <-- NO LONGER USED
+
 HOSPITAL_NAME = "AI Multispeciality Hospital"
 HOSPITAL_ADDRESS = "123 Health Avenue, Medical District"
 
@@ -183,41 +185,93 @@ DOCTOR_DATA = {
 }
 
 # ---------- LOAD APPOINTMENTS ----------
-@st.cache_data(ttl=5)
-def load_appointments():
-    if not os.path.exists(APPOINTMENT_FILE):
+def load_appointments(username=None):
+    """Fetches appointments from Supabase."""
+    if not supabase:
+        return pd.DataFrame()
+    
+    try:
+        query = supabase.table("appointments").select("*")
+        if username:
+            query = query.eq("username", username)
+        
+        res = query.order("id", desc=True).execute()
+        
+        # Convert to DataFrame and rename columns to match the old app's expectations
+        if res.data:
+            df = pd.DataFrame(res.data)
+            df = df.rename(columns={
+                "id": "ID",
+                "username": "Username",
+                "patient_name": "Patient",
+                "body_part": "Body Part",
+                "department": "Department",
+                "doctor_name": "Doctor",
+                "specialization": "Specialization",
+                "experience": "Experience",
+                "fee": "Fee",
+                "treatment": "Treatment",
+                "appointment_date": "Date",
+                "time_slot": "Time Slot",
+                "room": "Room",
+                "status": "Status"
+            })
+            return df
         return pd.DataFrame(columns=[
             "ID", "Username", "Patient", "Body Part", "Department",
             "Doctor", "Specialization", "Experience", "Fee",
             "Treatment", "Date", "Time Slot", "Room", "Status"
         ])
-    return pd.read_csv(APPOINTMENT_FILE)
+    except Exception as e:
+        print(f"Error loading appointments: {e}")
+        return pd.DataFrame()
 
 # ---------- SAVE APPOINTMENT ----------
 def save_appointment(username, patient, body_part, department, doctor_name,
                      doctor_spec, doctor_exp, doctor_fee, treatment,
                      appt_date, time_slot, room):
-    df = load_appointments()
-    new_id = len(df) + 1
-    new_row = {
-        "ID": new_id, "Username": username, "Patient": patient,
-        "Body Part": body_part, "Department": department,
-        "Doctor": doctor_name, "Specialization": doctor_spec,
-        "Experience": f"{doctor_exp} yrs", "Fee": f"₹{doctor_fee}",
-        "Treatment": treatment, "Date": appt_date,
-        "Time Slot": time_slot, "Room": room, "Status": "Booked"
-    }
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    df.to_csv(APPOINTMENT_FILE, index=False)
-    st.cache_data.clear()
-    return new_id
+    """Inserts a new appointment into Supabase."""
+    if not supabase:
+        return None
+    
+    try:
+        res = supabase.table("appointments").insert({
+            "username": username,
+            "patient_name": patient,
+            "body_part": body_part,
+            "department": department,
+            "doctor_name": doctor_name,
+            "specialization": doctor_spec,
+            "experience": f"{doctor_exp} yrs",
+            "fee": f"₹{doctor_fee}",
+            "treatment": treatment,
+            "appointment_date": str(appt_date),
+            "time_slot": time_slot,
+            "room": room,
+            "status": "Booked"
+        }).execute()
+        
+        if res.data:
+            return res.data[0]["id"]
+        return None
+    except Exception as e:
+        st.error(f"Failed to book appointment: {e}")
+        return None
 
 # ---------- CANCEL APPOINTMENT ----------
 def cancel_appointment(appt_id):
-    df = load_appointments()
-    df.loc[df["ID"] == appt_id, "Status"] = "Cancelled"
-    df.to_csv(APPOINTMENT_FILE, index=False)
-    st.cache_data.clear()
+    """Updates appointment status to 'Cancelled' in Supabase."""
+    if not supabase:
+        return
+    
+    try:
+        supabase.table("appointments")\
+            .update({"status": "Cancelled"})\
+            .eq("id", appt_id)\
+            .execute()
+    except Exception as e:
+        st.error(f"Failed to cancel: {e}")
+
 
 # ---------- RENDER STAR RATING ----------
 def render_stars(rating):
@@ -228,24 +282,26 @@ def render_stars(rating):
 
 # ---------- SHOW APPOINTMENT SECTION ----------
 def show_appointment_section(username, user_full_name):
-    st.markdown("<div class='section-header'>📅 Specialist Doctor Appointment</div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="section-header">
+            <img src="https://img.icons8.com/fluency/96/calendar.png" width="50" style="margin-bottom: 10px;">
+            <br>
+            📅 Specialist Doctor Appointment
+        </div>
+    """, unsafe_allow_html=True)
 
     row1, row2 = st.columns(2)
 
     with row1:
-        st.markdown("<div class='glass-box'>", unsafe_allow_html=True)
-        st.markdown("<div class='section-title'>📝 Book Appointment</div>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card' style='margin-bottom: 24px; border-left: 5px solid var(--p-indigo);'>", unsafe_allow_html=True)
+        st.markdown(f"""
+            <div style='font-size: 1.4rem; font-weight: 800; color: var(--text-primary);'>BOOK NEW CONSULTATION</div>
+            <div style='font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;'>{HOSPITAL_NAME}</div>
+            <div style='font-size: 0.8rem; color: var(--p-indigo); margin-top: 2px;'>{HOSPITAL_ADDRESS}</div>
+        """, unsafe_allow_html=True)
 
         appt_name = st.text_input("👤 Patient Name", value=user_full_name, key="appt_name")
 
-        # Hospital Info
-        st.markdown(f"""
-        <div style='background:rgba(124,58,237,0.08); border:1px solid rgba(124,58,237,0.2);
-             padding:10px 14px; border-radius:12px; margin-bottom:14px; font-size:0.85rem;'>
-            🏥 <b style='color:#c4b5fd;'>{HOSPITAL_NAME}</b><br>
-            📍 <span style='color:#a89ec9;'>{HOSPITAL_ADDRESS}</span>
-        </div>
-        """, unsafe_allow_html=True)
 
         # Step 1
         st.markdown("**Step 1 — Select Body Part / Problem:**")
@@ -275,23 +331,24 @@ def show_appointment_section(username, user_full_name):
         for doc in doctors:
             stars = render_stars(doc["rating"])
             st.markdown(f"""
-            <div class='doctor-info-card' style='padding:12px 14px;'>
-                <div style='display:flex; justify-content:space-between; align-items:flex-start;'>
+            <div class='glass-card' style='padding: 16px; margin-bottom: 12px; border-color: rgba(255,255,255,0.05);'>
+                <div style='display: flex; justify-content: space-between; align-items: flex-start;'>
                     <div>
-                        <div style='font-weight:700; color:#6ee7b7; font-size:0.92rem;'>👨‍⚕️ {doc["name"]}</div>
-                        <div style='color:#a89ec9; font-size:0.8rem; margin-top:2px;'>{doc["spec"]}</div>
+                        <div style='font-weight: 700; color: var(--p-indigo); font-size: 1rem;'>{doc["name"]}</div>
+                        <div style='color: var(--text-secondary); font-size: 0.8rem;'>{doc["spec"]}</div>
                     </div>
-                    <div style='text-align:right;'>
-                        <div style='color:#fbbf24; font-size:0.82rem;'>{stars} {doc["rating"]}</div>
-                        <div style='color:#c4b5fd; font-size:0.8rem; font-weight:700;'>₹{doc["fee"]}</div>
+                    <div style='text-align: right;'>
+                        <div style='color: #fbbf24; font-size: 0.8rem;'>{stars} {doc["rating"]}</div>
+                        <div style='color: var(--text-primary); font-size: 0.9rem; font-weight: 700;'>₹{doc["fee"]}</div>
                     </div>
                 </div>
-                <div style='display:flex; gap:15px; margin-top:8px; font-size:0.78rem; color:#7c74a8;'>
-                    <span>🎓 {doc["exp"]} yrs exp</span>
+                <div style='display: flex; gap: 16px; margin-top: 12px; font-size: 0.75rem; color: var(--text-dim);'>
+                    <span>🎓 {doc["exp"]} yrs experience</span>
                     <span>📅 {doc["avail"]}</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
 
         doctor_names = [f"{d['name']} ({d['spec']})" for d in doctors]
         selected_doctor_full = st.selectbox("Choose Doctor", doctor_names)
@@ -341,40 +398,36 @@ def show_appointment_section(username, user_full_name):
         st.markdown("<div class='glass-box'>", unsafe_allow_html=True)
         st.markdown("<div class='section-title'>📋 My Appointments</div>", unsafe_allow_html=True)
 
-        df_appts = load_appointments()
-        if not df_appts.empty and "Username" in df_appts.columns:
-            df_appts = df_appts[df_appts["Username"] == username]
+        df_appts = load_appointments(username)
+
 
         if st.button("🔄 Refresh", use_container_width=False):
             st.rerun()
 
         if not df_appts.empty:
             for _, row in df_appts.iterrows():
-                card_class  = "cancelled" if row["Status"] == "Cancelled" else "appt-card"
-                status_icon = "❌" if row["Status"] == "Cancelled" else "✅"
-                fee_str  = row.get("Fee", "N/A")
-                room_str = row.get("Room", "N/A")
-                spec_str = row.get("Specialization", "")
-                exp_str  = row.get("Experience", "")
-
+                is_cancelled = row["Status"] == "Cancelled"
+                status_icon = "❌" if is_cancelled else "✅"
+                
                 st.markdown(f"""
-                <div class='{card_class}'>
-                    <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'>
-                        <span style='font-weight:800; font-size:0.95rem;'>{status_icon} ID: {row['ID']}</span>
-                        <span style='background:rgba(251,191,36,0.15); color:#fbbf24; padding:3px 10px;
-                             border-radius:20px; font-size:0.75rem; font-weight:700;'>{fee_str}</span>
+                <div class='glass-card' style='margin-bottom: 16px; opacity: {0.5 if is_cancelled else 1}; border-left: 3px solid {"var(--text-dim)" if is_cancelled else "var(--p-indigo)"};'>
+                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;'>
+                        <span style='font-weight: 800; font-size: 0.9rem; color: var(--text-primary);'>{status_icon} ID: {row['ID']}</span>
+                        <span class='hb' style='margin-top: 0;'>₹{row.get("Fee", "N/A")}</span>
                     </div>
-                    👤 <b>Patient:</b> {row['Patient']}<br>
-                    🏥 <b>Body Part:</b> {row['Body Part']}<br>
-                    🏨 <b>Department:</b> {row['Department']}<br>
-                    👨‍⚕️ <b>Doctor:</b> {row['Doctor']} <span style='color:#a89ec9; font-size:0.8rem;'>— {spec_str}</span><br>
-                    🎓 <b>Experience:</b> {exp_str}<br>
-                    💊 <b>Treatment:</b> {row['Treatment']}<br>
-                    📍 <b>Room:</b> {room_str}<br>
-                    📅 <b>Date:</b> {row['Date']} &nbsp;|&nbsp; ⏰ {row['Time Slot']}<br>
-                    <span style='font-size:0.78rem; opacity:0.6; margin-top:4px; display:block;'>Status: {row['Status']}</span>
+                    <div style='font-size: 0.85rem; line-height: 1.6;'>
+                        👤 <b>Patient:</b> {row['Patient']}<br>
+                        👨‍⚕️ <b>Surgeon:</b> {row['Doctor']} <span style='font-size: 0.75rem; color: var(--text-secondary);'>({row.get("Specialization", "")})</span><br>
+                        💊 <b>Treatment:</b> {row['Treatment']}<br>
+                        📍 <b>Location:</b> {row.get("Room", "N/A")}<br>
+                        📅 <b>Schedule:</b> <span style='color: var(--p-cyan); font-weight: 600;'>{row['Date']} | {row['Time Slot']}</span>
+                    </div>
+                    <div style='font-size: 0.7rem; color: var(--text-dim); margin-top: 8px; text-transform: uppercase; letter-spacing: 1px;'>
+                        Status: {row['Status']}
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
+
 
             st.markdown("<br>**❌ Cancel Appointment:**")
             cancel_id = st.number_input("Enter Appointment ID", min_value=1, step=1)

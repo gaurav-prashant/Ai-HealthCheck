@@ -22,36 +22,52 @@ def clean_result(text):
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
+def parse_bilingual(text):
+    en = text.split("[EN]")[-1].split("[/EN]")[0].strip() if "[EN]" in text else text
+    hi = text.split("[HI]")[-1].split("[/HI]")[0].strip() if "[HI]" in text else ""
+    return en, hi
+
 # ---------- ANALYZE SKIN IMAGE ----------
 def analyze_skin(image, body_part, symptoms=""):
     try:
         model  = genai.GenerativeModel("gemini-1.5-flash")
-        prompt = f"""You are an expert dermatologist AI. Carefully analyze this skin image.
+        prompt = f"""You are an expert dermatologist AI. 
+For every response, provide the information in both **English and Hindi**. 
+
+Each response must be wrapped in language tags for parsing. Use this EXACT format:
+
+[EN]
+1. VISUAL FINDINGS:
+Describe exactly what you see — color, texture, shape, size, pattern.
+2. POSSIBLE CONDITIONS:
+List possible skin diseases with High/Medium/Low likelihood.
+3. WARNING SIGNS:
+Serious conditions or urgent signs.
+4. RECOMMENDED SPECIALIST:
+Which doctor and urgency.
+5. TREATMENT AND CARE:
+Treatments, remedies, skincare.
+6. TESTS RECOMMENDED:
+Biopsies or tests.
+[/EN]
+
+[HI]
+1. दृश्य निष्कर्ष (Visual Findings):
+वर्णन करें कि आप क्या देख रहे हैं - रंग, बनावट, आकार, पैटर्न।
+2. संभावित स्थितियां (Possible Conditions):
+संभावित त्वचा रोगों की सूची (उच्च/मध्यम/निम्न संभावना)।
+3. चेतावनी संकेत (Warning Signs):
+गंभीर स्थितियां या तत्काल संकेत।
+4. अनुशंसित विशेषज्ञ (Specialist):
+किस डॉक्टर से मिलें और कितना जरूरी है।
+5. उपचार और देखभाल (Treatment & Care):
+उपचार, घरेलू उपचार और त्वचा की देखभाल।
+6. अनुशंसित परीक्षण (Tests):
+बायोप्सी या अन्य परीक्षण।
+[/HI]
 
 Body Part: {body_part}
 {f"Patient Symptoms: {symptoms}" if symptoms else ""}
-
-Provide a detailed dermatological analysis:
-
-1. VISUAL FINDINGS:
-Describe exactly what you see — color, texture, shape, size, pattern.
-
-2. POSSIBLE CONDITIONS:
-List possible skin diseases with High/Medium/Low likelihood.
-Consider: Acne, Eczema, Psoriasis, Ringworm, Fungal infection, Vitiligo,
-Rosacea, Hives, Dermatitis, Melanoma, Warts, Herpes, Scabies, Heat Rash.
-
-3. WARNING SIGNS:
-Any signs of serious conditions like skin cancer? What needs immediate attention?
-
-4. RECOMMENDED SPECIALIST:
-Which doctor to consult? How urgent? (Emergency/Urgent/Soon/Routine)
-
-5. TREATMENT AND CARE:
-Possible treatments, home remedies, and skincare advice.
-
-6. TESTS RECOMMENDED:
-Any skin tests or biopsies recommended?
 
 Note: AI analysis for reference only. Always consult a qualified dermatologist."""
 
@@ -63,16 +79,18 @@ Note: AI analysis for reference only. Always consult a qualified dermatologist."
         from groq import Groq
         try:
             client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-            prompt2 = f"""You are a dermatologist AI. Patient has skin condition on {body_part}.
+            prompt2 = f"""You are a dermatologist AI.
+Provide the analysis in both **English and Hindi** wrapped in [EN]...[/EN] and [HI]...[/HI] tags.
+
+Patient has skin condition on {body_part}.
 Symptoms: {symptoms}
 
-Provide analysis:
-1. VISUAL FINDINGS - common findings for skin conditions on {body_part}
-2. POSSIBLE CONDITIONS - list diseases with High/Medium/Low likelihood
-3. WARNING SIGNS - signs needing immediate attention
-4. RECOMMENDED SPECIALIST - which doctor and urgency
-5. TREATMENT AND CARE - treatments and home remedies
-6. TESTS RECOMMENDED - any tests needed
+1. VISUAL FINDINGS
+2. POSSIBLE CONDITIONS
+3. WARNING SIGNS
+4. RECOMMENDED SPECIALIST
+5. TREATMENT AND CARE
+6. TESTS RECOMMENDED
 
 Note: Image could not be analyzed directly. This is symptom-based guidance only."""
 
@@ -87,7 +105,13 @@ Note: Image could not be analyzed directly. This is symptom-based guidance only.
 
 # ---------- SHOW SKIN DISEASE DETECTOR ----------
 def show_skin_disease():
-    st.markdown("<div class='section-header'>🔬 Skin Disease Detector</div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="section-header">
+            <img src="https://img.icons8.com/fluency/96/microscope.png" width="50" style="margin-bottom: 10px;">
+            <br>
+            🔬 Skin Disease Detector
+        </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("""
     <div style='background:rgba(251,146,60,0.08); border:1px solid rgba(251,146,60,0.25);
@@ -195,17 +219,31 @@ def show_skin_disease():
             color  = "#34d399" if img_used else "#fbbf24"
 
             st.markdown(f"""
-            <div style='display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;'>
-                <span style='background:rgba(251,146,60,0.15);color:#fb923c;
-                     padding:5px 14px;border-radius:20px;font-size:0.8rem;font-weight:700;
-                     border:1px solid rgba(251,146,60,0.3);'>🔬 {part}</span>
-                <span style='background:rgba(16,185,129,0.1);color:{color};
-                     padding:5px 14px;border-radius:20px;font-size:0.8rem;font-weight:600;
-                     border:1px solid rgba(16,185,129,0.2);'>{method}</span>
+            <div style='display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;justify-content:space-between;'>
+                <div style='display:flex;gap:8px;align-items:center;'>
+                    <span style='background:rgba(251,146,60,0.15);color:#fb923c;
+                         padding:5px 14px;border-radius:20px;font-size:0.8rem;font-weight:700;
+                         border:1px solid rgba(251,146,60,0.3);'>🔬 {part}</span>
+                    <span style='background:rgba(16,185,129,0.1);color:{color};
+                         padding:5px 14px;border-radius:20px;font-size:0.8rem;font-weight:600;
+                         border:1px solid rgba(16,185,129,0.2);'>{method}</span>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-            sections = result.split("\n\n")
+            st.session_state.skin_view_mode = st.segmented_control(
+                "Skin Lang Opt", ["English", "Hindi", "Bilingual"],
+                default=st.session_state.skin_view_mode, label_visibility="collapsed"
+            )
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            en_val, hi_val = parse_bilingual(result)
+            render_text = ""
+            if st.session_state.skin_view_mode == "English": render_text = en_val
+            elif st.session_state.skin_view_mode == "Hindi": render_text = hi_val if hi_val else en_val
+            else: render_text = f"{en_val}\n\n---\n\n{hi_val}" if hi_val else en_val
+
+            sections = render_text.split("\n\n")
             for section in sections:
                 section = section.strip()
                 if not section:

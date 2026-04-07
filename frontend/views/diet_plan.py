@@ -12,7 +12,8 @@ co = cohere.Client(os.getenv("COHERE_API_KEY"))
 def generate_diet_plan(disease, body_type, age):
     try:
         prompt = f"""
-You are a professional nutritionist. Create a detailed 1-day diet plan for a patient with the following details:
+You are a professional nutritionist. ALWAYS RESPOND IN ENGLISH.
+Create a detailed 1-day diet plan for a patient with the following details:
 - Disease/Condition: {disease}
 - Diet Type: {body_type}
 - Age: {age}
@@ -59,7 +60,13 @@ Keep it simple, healthy and suitable for the disease. Max 3-4 items per section.
 
 # ---------- SHOW DIET PLAN ----------
 def show_diet_plan_section():
-    st.markdown("<div class='section-header'>🥗 AI Diet Plan Generator</div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="section-header">
+            <img src="https://img.icons8.com/fluency/96/salad.png" width="50" style="margin-bottom: 10px;">
+            <br>
+            🥗 AI Diet Plan Generator
+        </div>
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 

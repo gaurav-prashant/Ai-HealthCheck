@@ -5,7 +5,13 @@
 import streamlit as st
 
 def show_hospital_finder():
-    st.markdown("<div class='section-header'>🏥 Nearby Hospital Finder</div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="section-header">
+            <img src="https://img.icons8.com/fluency/96/hospital.png" width="50" style="margin-bottom: 10px;">
+            <br>
+            🏥 Nearby Hospital Finder
+        </div>
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 2])
 

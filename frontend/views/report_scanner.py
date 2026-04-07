@@ -1,29 +1,38 @@
 # ============================================================
-# report_scanner.py — Actual Image Scanner using Gemini 1.5 Flash
+# report_scanner.py — Actual Image Scanner using Groq Llama 3.2 Vision
 # ============================================================
 
 import streamlit as st
 import os
-import google.generativeai as genai
+import base64
+import io
 from PIL import Image
 from dotenv import load_dotenv
+from groq import Groq
 load_dotenv(r"C:\AI_Health\.env")
 
-# ---------- GEMINI SETUP ----------
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# ---------- GROQ SETUP ----------
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# ---------- ANALYZE IMAGE ----------
+# ---------- ANALYZE IMAGE (Using Groq Vision) ----------
+def encode_image(image):
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode('utf-8')
+
 def analyze_image(image, report_type, body_part, symptoms=""):
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-
-        prompt = f"""You are an expert medical AI. Carefully analyze this {report_type} image of {body_part}.
+        base64_image = encode_image(image)
+        
+        prompt = f"""You are an expert medical AI specializing in radiology and lab report analysis. 
+ALWAYS RESPOND IN ENGLISH, regardless of any non-English text in the report or user input.
+Carefully analyze this {report_type} image of {body_part}.
 {f"Patient symptoms: {symptoms}" if symptoms else ""}
 
-Provide detailed analysis in these sections:
+Provide detailed analysis in these EXACT sections:
 
 1. 🔍 FINDINGS:
-What do you see in this {report_type}? Describe all visible features, abnormalities, and observations.
+What do you see in this {report_type}? Describe all visible features, abnormalities, and observations based on the image provided.
 
 2. 🦠 POSSIBLE CONDITIONS:
 List possible medical conditions based on what you see. Rate each as High/Medium/Low likelihood.
@@ -37,22 +46,39 @@ Any findings that need immediate attention?
 5. 💡 NEXT STEPS:
 What should the patient do next?
 
-Be specific and accurate. Note: This is AI analysis for reference only — always consult a qualified doctor."""
+Be specific and accurate. Provide medical reasoning. 
+Note: This is AI analysis for reference only — always consult a qualified doctor."""
 
-        response = model.generate_content([prompt, image])
-        return response.text, True
+        response = groq_client.chat.completions.create(
+            model="llama-3.2-11b-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{base64_image}",
+                            },
+                        },
+                    ],
+                }
+            ],
+            max_tokens=1024,
+            temperature=0.1 # Lower temperature for better factual consistency in reports
+        )
+        return response.choices[0].message.content, True
 
     except Exception as e:
-        # Fallback to text analysis using Groq
+        # Fallback to text analysis
         return analyze_text_fallback(report_type, body_part, symptoms, str(e)), False
 
 # ---------- FALLBACK TEXT ANALYSIS ----------
 def analyze_text_fallback(report_type, body_part, symptoms, error=""):
     try:
-        from groq import Groq
-        groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
-        prompt = f"""You are a medical AI. A patient has a {report_type} of {body_part}.
+        prompt = f"""You are a medical AI. ALWAYS RESPOND IN ENGLISH.
+A patient has a {report_type} of {body_part}.
 {f"Symptoms: {symptoms}" if symptoms else ""}
 
 Provide general medical guidance:
@@ -87,16 +113,22 @@ Note: Image could not be analyzed directly. This is general guidance only."""
 
 # ---------- SHOW REPORT SCANNER ----------
 def show_report_scanner():
-    st.markdown("<div class='section-header'>🔬 Medical Report Scanner</div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="section-header">
+            <img src="https://img.icons8.com/fluency/96/mri-scan.png" width="50" style="margin-bottom: 10px;">
+            <br>
+            🔬 Medical Report Scanner
+        </div>
+    """, unsafe_allow_html=True)
 
     # Info banner
     st.markdown("""
     <div style='background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.25);
          padding:12px 16px; border-radius:14px; margin-bottom:18px;
          font-size:0.87rem; color:#6ee7b7; line-height:1.8;'>
-        🤖 <b>Powered by Gemini 1.5 Flash</b> — Actual AI image analysis!<br>
-        📸 Upload X-Ray, CT Scan, MRI or any medical report image<br>
-        🔍 AI will <b>actually read and analyze</b> your medical image
+        🤖 <b>Powered by Groq Llama 3.2 Vision</b> — Professional medical AI analysis!<br>
+        📸 Upload X-Ray, CT Scan, Blood Report, MRI or any medical report image<br>
+        🔍 AI will <b>actually read and analyze</b> your medical image in real-time
     </div>
     """, unsafe_allow_html=True)
 
@@ -107,7 +139,7 @@ def show_report_scanner():
         st.markdown("<div class='section-title'>📤 Upload Medical Report</div>", unsafe_allow_html=True)
 
         report_type = st.selectbox("🏥 Report Type", [
-            "X-Ray", "CT Scan", "MRI Scan", "Ultrasound",
+            "X-Ray", "CT Scan", "MRI Scan", "Blood Report","Ultrasound",
              "ECG Report", "Prescription",
             "Other Medical Report"
         ])
@@ -134,8 +166,8 @@ def show_report_scanner():
             image = Image.open(uploaded_file)
             st.image(image, caption=f"📋 {report_type} — {body_part}", use_column_width=True)
 
-            if st.button("🔬 Analyze with Gemini AI", use_container_width=True):
-                with st.spinner("🤖 Gemini 1.5 Flash is analyzing your image... Please wait..."):
+            if st.button("🔬 Analyze with AI", use_container_width=True):
+                with st.spinner("🤖 Groq Llama 3.2 is analyzing your image... Please wait..."):
                     result, used_image = analyze_image(image, report_type, body_part, symptoms)
                 st.session_state.report_result  = result
                 st.session_state.report_type    = report_type
@@ -236,7 +268,7 @@ def show_report_scanner():
             st.download_button(
                 "📄 Download Analysis",
                 data=result,
-                file_name=f"{report_name}_gemini_analysis.txt",
+                file_name=f"{report_name}_groq_analysis.txt",
                 mime="text/plain"
             )
 
@@ -250,7 +282,7 @@ def show_report_scanner():
                 <div style='font-size:5rem; margin-bottom:20px;'>🔬</div>
                 <p style='font-size:1.1rem; font-weight:600; color:#6b7280;'>No analysis yet</p>
                 <p style='font-size:0.85rem; color:#4b5563;'>
-                    Upload a medical image<br>and click Analyze with Gemini AI
+                    Upload a medical image<br>and click Analyze with Groq AI
                 </p>
             </div>
             """, unsafe_allow_html=True)

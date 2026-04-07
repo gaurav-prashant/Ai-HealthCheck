@@ -21,7 +21,8 @@ def analyze_blood_image(image, age, symptoms=""):
         image.save(buf, format="PNG")
         b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-        prompt = f"""You are an expert hematologist. Analyze this blood test report image.
+        prompt = f"""You are an expert hematologist. ALWAYS RESPOND IN ENGLISH.
+Analyze this blood test report image.
 
 Patient Age: {age}
 {f"Symptoms: {symptoms}" if symptoms else ""}
@@ -54,7 +55,8 @@ Note: AI analysis for reference only. Always consult a qualified doctor."""
 def analyze_blood_manual(values, age, symptoms=""):
     try:
         test_lines = "\n".join([f"- {k}: {v}" for k, v in values.items() if v and v.strip()])
-        prompt = f"""You are an expert hematologist. Analyze this blood report:
+        prompt = f"""You are an expert hematologist. ALWAYS RESPOND IN ENGLISH. 
+Analyze this blood report:
 
 Patient Age: {age}
 {f"Symptoms: {symptoms}" if symptoms else ""}
@@ -118,7 +120,13 @@ def render_result(result):
 
 # ── MAIN FUNCTION ──
 def show_blood_report():
-    st.markdown("<div class='section-header'>🩸 Blood Report Analyzer</div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="section-header">
+            <img src="https://img.icons8.com/fluency/96/test-tube.png" width="50" style="margin-bottom: 10px;">
+            <br>
+            🩸 Blood Report Analyzer
+        </div>
+    """, unsafe_allow_html=True)
 
     # Patient info — gender removed
     st.markdown("<div class='patient-box'>", unsafe_allow_html=True)
